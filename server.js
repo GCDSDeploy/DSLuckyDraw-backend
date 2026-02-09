@@ -7,7 +7,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { registerDrawRoute } from './api/draw-api.js';
-import { registerApiRoutes } from './api/api-routes.js';
+import apiRoutes from './api/api-routes.js';
 
 const app = express();
 
@@ -19,9 +19,9 @@ app.use(cors({
 app.use(express.json());
 
 app.get('/api/ping', (req, res) => res.json({ msg: 'pong' }));
+app.use('/api', apiRoutes);
 
 registerDrawRoute(app);
-registerApiRoutes(app);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
