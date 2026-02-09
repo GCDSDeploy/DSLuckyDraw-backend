@@ -11,18 +11,9 @@ import { registerApiRoutes } from './api/api-routes.js';
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  ...(process.env.FRONTEND_ORIGIN ? [process.env.FRONTEND_ORIGIN] : []),
-  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean) : []),
-];
-
+const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean) || [];
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    cb(null, false);
-  },
+  origin: corsOrigins,
   credentials: true,
 }));
 app.use(express.json());
