@@ -7,8 +7,7 @@
  */
 
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
-import { getConnectionConfig } from './draw.js';
+import { getConnection } from './draw.js';
 
 const BASE = process.env.API_BASE_URL || 'http://localhost:3000';
 
@@ -19,7 +18,7 @@ async function postDraw() {
 }
 
 async function integrityCheck() {
-  const conn = await mysql.createConnection(getConnectionConfig());
+  const conn = await getConnection();
   try {
     const [total] = await conn.query('SELECT COUNT(*) AS n FROM signs');
     const [undrawn] = await conn.query('SELECT COUNT(*) AS n FROM signs WHERE is_drawn = false');

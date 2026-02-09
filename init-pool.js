@@ -1,9 +1,3 @@
-/**
- * Step 1 — Database pool initialization.
- * Creates `signs` table and inserts 10,000 pre-generated signs.
- * Uses env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME. No API, no draw logic.
- */
-
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 
@@ -14,6 +8,8 @@ const POOL_SPEC = [
   { level: 0, type: 'Empty', reward_code: 'EMPTY', count: 9610 },
 ];
 
+const BATCH_SIZE = 500;
+
 function signId(levelNumber, runningIndex) {
   const levelStr = String(levelNumber).padStart(2, '0');
   const indexStr = String(runningIndex).padStart(4, '0');
@@ -21,110 +17,101 @@ function signId(levelNumber, runningIndex) {
 }
 
 async function run() {
-  const host = process.env.DB_HOST || 'localhost';
-  const user = process.env.DB_USER || 'root';
-  const password = process.env.DB_PASSWORD || '';
-  const database = process.env.DB_NAME || 'luckydraw';
-
-  if (!process.env.DB_HOST && !process.env.DB_USER) {
-    console.warn('Using defaults. Set DB_HOST, DB_USER, DB_PASSWORD, DB_NAME for your environment.');
-  }
+  console.log('DB_HOST:', process.env.DB_HOST);
+  console.log('DB_PORT:', process.env.DB_PORT);
+  console.log('DB_USER:', process.env.DB_USER);
+  console.log('DB_NAME:', process.env.DB_NAME);
 
   const conn = await mysql.createConnection({
-    host,
-    user,
-    password,
-    database,
-    multipleStatements: true,
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
   });
 
   try {
-    console.log('Creating table `signs`...');
-    await conn.query(`
+    // Create table if not exists
+    await conn.execute(`
       CREATE TABLE IF NOT EXISTS signs (
-        id         VARCHAR(20) PRIMARY KEY COMMENT 'Sign ID: S<levelNumber>-<runningIndex>',
-        level      INT         NOT NULL COMMENT '0=Empty, 1=Top-Top, 2=Top, 3=Special',
-        type       VARCHAR(20) NOT NULL,
-        reward_code VARCHAR(20) NOT NULL,
-        is_drawn   BOOLEAN     NOT NULL DEFAULT FALSE
-      );
+        id VARCHAR(10) PRIMARY KEY,
+        level INT NOT NULL,
+        type VARCHAR(10) NOT NULL,
+        reward_code VARCHAR(10) NOT NULL,
+        is_drawn BOOLEAN DEFAULT false
+      )
     `);
-    try {
-      await conn.query('CREATE INDEX idx_signs_level_drawn ON signs (level, is_drawn)');
-    } catch (e) {
-      if (e.code !== 'ER_DUP_KEYNAME') throw e;
-    }
 
-    const existing = await conn.query('SELECT COUNT(*) AS n FROM signs');
-    const count = existing[0][0].n;
-    if (count === 10000) {
-      console.log('Pool already has 10,000 rows. Skipping insert.');
-    } else if (count > 0) {
-      console.log(`Table has ${count} rows (expected 0 or 10000). Truncating and re-inserting.`);
-      await conn.query('TRUNCATE TABLE signs');
-    }
+    await conn.execute(`TRUNCATE TABLE signs`);
 
-    if (count !== 10000) {
-      console.log('Inserting 10,000 signs...');
+    // Batch insert (500 per insert)
+    for (const spec of POOL_SPEC) {
       const rows = [];
-      for (const spec of POOL_SPEC) {
-        for (let i = 1; i <= spec.count; i++) {
-          rows.push([
-            signId(spec.level, i),
-            spec.level,
-            spec.type,
-            spec.reward_code,
-            false,
-          ]);
-        }
+      for (let i = 1; i <= spec.count; i++) {
+        rows.push([signId(spec.level, i), spec.level, spec.type, spec.reward_code]);
       }
-      const BATCH = 500;
-      for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH);
-        const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        const placeholders = batch.map(() => '(?, ?, ?, ?)').join(', ');
         const values = batch.flat();
-        await conn.query(
-          `INSERT INTO signs (id, level, type, reward_code, is_drawn) VALUES ${placeholders}`,
+        await conn.execute(
+          `INSERT INTO signs (id, level, type, reward_code) VALUES ${placeholders}`,
           values
         );
       }
-      console.log('Insert complete.');
     }
 
-    console.log('Verification:');
-    const [total] = await conn.query('SELECT COUNT(*) AS n FROM signs');
-    console.log('  Total rows:', total[0].n);
-
-    const [byLevel] = await conn.query(
-      'SELECT level, type, COUNT(*) AS n FROM signs GROUP BY level, type ORDER BY level'
-    );
-    for (const row of byLevel) {
-      console.log(`  level=${row.level} (${row.type}): ${row.n}`);
-    }
-
-    const [distinctIds] = await conn.query('SELECT COUNT(DISTINCT id) AS n FROM signs');
-    console.log('  Distinct ids:', distinctIds[0].n);
-
-    const [undrawn] = await conn.query('SELECT COUNT(*) AS n FROM signs WHERE is_drawn = false');
-    console.log('  is_drawn = false:', undrawn[0].n);
-
-    const ok =
-      total[0].n === 10000 &&
-      distinctIds[0].n === 10000 &&
-      undrawn[0].n === 10000 &&
-      byLevel.length === 4;
-    if (ok) {
-      console.log('\nStep 1 verification PASSED.');
-    } else {
-      console.error('\nStep 1 verification FAILED.');
+    // Inline verification
+    const expectedTotal = 10000;
+    const [totalRows] = await conn.execute('SELECT COUNT(*) AS total FROM signs');
+    const total = totalRows[0].total;
+    if (total !== expectedTotal) {
+      console.error(`Verification failed: total rows ${total} !== ${expectedTotal}`);
       process.exit(1);
     }
+
+    for (const spec of POOL_SPEC) {
+      const [levelRows] = await conn.execute(
+        'SELECT COUNT(*) AS cnt FROM signs WHERE level = ?',
+        [spec.level]
+      );
+      const cnt = levelRows[0].cnt;
+      if (cnt !== spec.count) {
+        console.error(`Verification failed: level ${spec.level} count ${cnt} !== ${spec.count}`);
+        process.exit(1);
+      }
+    }
+
+    const [distinctRows] = await conn.execute('SELECT COUNT(DISTINCT id) AS cnt FROM signs');
+    const distinctIds = distinctRows[0].cnt;
+    if (distinctIds !== expectedTotal) {
+      console.error(`Verification failed: distinct IDs ${distinctIds} !== ${expectedTotal}`);
+      process.exit(1);
+    }
+
+    const [drawnRows] = await conn.execute('SELECT COUNT(*) AS cnt FROM signs WHERE is_drawn = true');
+    const drawnCount = drawnRows[0].cnt;
+    if (drawnCount !== 0) {
+      console.error(`Verification failed: is_drawn count ${drawnCount} !== 0`);
+      process.exit(1);
+    }
+
+    // Summary
+    console.log('--- Summary ---');
+    console.log('Total rows:', total);
+    console.log('Counts per level:');
+    for (const spec of POOL_SPEC) {
+      console.log(`  level ${spec.level} (${spec.type}): ${spec.count}`);
+    }
+    console.log('Distinct IDs:', distinctIds);
+    console.log('is_drawn = false count:', total - drawnCount);
+    console.log('Step 1: Pool initialization complete ✅');
   } finally {
     await conn.end();
   }
 }
 
 run().catch((err) => {
-  console.error(err);
+  console.error('Step 1 failed:', err);
   process.exit(1);
 });

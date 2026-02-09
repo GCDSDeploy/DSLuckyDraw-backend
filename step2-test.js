@@ -7,8 +7,7 @@
  */
 
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
-import { draw, getConnectionConfig } from './draw.js';
+import { draw, getConnection } from './draw.js';
 
 async function runTests() {
   let passed = 0;
@@ -16,7 +15,7 @@ async function runTests() {
 
   console.log('--- Step 2 Tests ---\n');
 
-  const conn = await mysql.createConnection(getConnectionConfig());
+  const conn = await getConnection();
 
   async function integrityCheck() {
     const [total] = await conn.query('SELECT COUNT(*) AS n FROM signs');

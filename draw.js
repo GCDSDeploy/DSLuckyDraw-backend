@@ -8,13 +8,18 @@
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 
-function getConnectionConfig() {
-  return {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'luckydraw',
-  };
+/**
+ * Returns a new MySQL connection using env vars. Use for all Step 2 operations.
+ * @returns { Promise<import('mysql2/promise').Connection> }
+ */
+export async function getConnection() {
+  return await mysql.createConnection({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+  });
 }
 
 /**
@@ -22,7 +27,7 @@ function getConnectionConfig() {
  * @returns { Promise<{ status: 'OK', sign: { id, level, type, reward_code } } | { status: 'OUT_OF_STOCK' }> }
  */
 async function draw() {
-  const conn = await mysql.createConnection(getConnectionConfig());
+  const conn = await getConnection();
 
   async function attempt() {
     await conn.beginTransaction();
@@ -86,4 +91,4 @@ async function draw() {
   }
 }
 
-export { draw, getConnectionConfig };
+export { draw };

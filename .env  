@@ -1,0 +1,6 @@
+MySQL connection for Step 1 (DB init). Do NOT commit real credentials.
+DB_HOST=shortline.proxy.rlwy.net
+DB_USER=root
+DB_PASSWORD=tkbsOUhbiEEZNZoiMUXumtWfjQuFlpRH
+DB_NAME=railway
+PORT=3000
