@@ -23,6 +23,7 @@ router.post('/draw', async (req, res) => {
     const body = signToDrawResponse(result.sign);
     res.status(200).json(body);
   } catch (err) {
+    console.error('[POST /api/draw]', err.code || err.message, err.message);
     const isConnection = err.code && CONNECTION_ERROR_CODES.has(err.code);
     if (isConnection) {
       res.status(503).json({ error: 'Service Unavailable', message: 'Database unavailable' });
