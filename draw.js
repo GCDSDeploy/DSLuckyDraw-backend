@@ -13,9 +13,12 @@ import mysql from 'mysql2/promise';
  * @returns { Promise<import('mysql2/promise').Connection> }
  */
 export async function getConnection() {
+  const port = process.env.DB_PORT != null && process.env.DB_PORT !== ''
+    ? Number(process.env.DB_PORT)
+    : 3306;
   return await mysql.createConnection({
     host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
+    port,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,

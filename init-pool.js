@@ -22,9 +22,12 @@ async function run() {
   console.log('DB_USER:', process.env.DB_USER);
   console.log('DB_NAME:', process.env.DB_NAME);
 
+  const port = process.env.DB_PORT != null && process.env.DB_PORT !== ''
+    ? Number(process.env.DB_PORT)
+    : 3306;
   const conn = await mysql.createConnection({
     host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
+    port,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,

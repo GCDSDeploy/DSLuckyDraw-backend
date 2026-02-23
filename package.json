@@ -11,7 +11,8 @@
     "step1:reset": "node reset-pool.js",
     "step2:test": "node step2-test.js",
     "step3:start": "node server.js",
-    "step3:test": "node step3-test.js"
+    "step3:test": "node step3-test.js",
+    "db:test": "node test-connection.js"
   },
   "dependencies": {
     "express": "^4.18.2",
