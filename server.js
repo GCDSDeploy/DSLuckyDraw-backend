@@ -31,11 +31,13 @@ const devOrigins = [
   'http://192.168.71.5:5173',
 ];
 
-// Production CORS: allow Vercel frontend (and optional CORS_ORIGIN env)
-const prodOrigins = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean) || [
+// Production CORS: always allow both Vercel frontends; optional CORS_ORIGIN adds more
+const vercelOrigins = [
   'https://2026luck.vercel.app',
   'https://2026luck-git-staging-gcdsdeploys-projects.vercel.app',
 ];
+const extraOrigins = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+const prodOrigins = [...new Set([...vercelOrigins, ...extraOrigins])];
 
 const allowedOrigins = isDev ? devOrigins : prodOrigins;
 
